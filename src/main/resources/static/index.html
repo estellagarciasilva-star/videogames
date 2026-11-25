@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciador de Jogos de Videogame</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px 100px; }
+    h1 { text-align: center; }
+    .card { border: 1px solid #333; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+    .indisponivel { background: orange; color: white; padding: 2px 6px; margin-left: 8px; font-size: 0.8em; }
+    .btn-alterar { background: #5b9bd5; color: white; border: none; padding: 6px 12px; cursor: pointer; display: block; margin-bottom: 6px; }
+    .btn-excluir { background: #c00000; color: white; border: none; padding: 6px 12px; cursor: pointer; }
+    .campo { margin-bottom: 12px; }
+    label { display: block; font-weight: bold; }
+    input[type=text], input[type=number], textarea { width: 100%; padding: 6px; box-sizing: border-box; }
+    .erro { color: red; font-size: 0.85em; margin: 2px 0 0; }
+    #mensagem { padding: 8px; display: none; }
+    #mensagem.sucesso { display: block; background: #d4edda; color: #155724; }
+    #mensagem.falha { display: block; background: #f8d7da; color: #721c24; }
+    footer { position: fixed; bottom: 0; left: 0; right: 0; background: gray; color: white; text-align: center; padding: 8px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>Gerenciador de Jogos de Videogame</h1>
+  <p id="mensagem"></p>
+
+  <section id="telaLista">
+    <div id="lista"></div>
+    <button onclick="abrirFormNovo()">Incluir novo jogo</button>
+  </section>
+
+  <section id="telaForm" style="display:none">
+    <h2 id="tituloForm"></h2>
+    <form id="formJogo" novalidate>
+      <div class="campo">
+        <label for="titulo">Título</label>
+        <input type="text" id="titulo" name="titulo">
+        <p class="erro" id="erro-titulo"></p>
+      </div>
+      <div class="campo">
+        <label for="ano">Ano de lançamento</label>
+        <input type="number" id="ano" name="ano">
+        <p class="erro" id="erro-ano"></p>
+      </div>
+      <div class="campo">
+        <label for="plataforma">Plataforma</label>
+        <input type="text" id="plataforma" name="plataforma">
+        <p class="erro" id="erro-plataforma"></p>
+      </div>
+      <div class="campo">
+        <label>Disponível</label>
+        <label><input type="radio" name="disponivel" value="true" id="dispSim" checked> Sim</label>
+        <label><input type="radio" name="disponivel" value="false" id="dispNao"> Não</label>
+        <p class="erro" id="erro-disponivel"></p>
+      </div>
+      <div class="campo">
+        <label for="observacoes">Observações</label>
+        <textarea id="observacoes" name="observacoes" rows="4"></textarea>
+        <p class="erro" id="erro-observacoes"></p>
+      </div>
+      <button type="submit">Salvar</button>
+      <button type="button" onclick="mostrarLista()">Cancelar</button>
+    </form>
+  </section>
+
+  <footer>
+    Estella Garcia Silva / Nicolle Lima Feitosa / Turma 3B Noturno / 2026<br>
+    Usou IA?: Sim, Claude.
+  </footer>
+
+  <script>
+    let idEmEdicao = null;
+
+    function mostrarMensagem(texto, ehErro) {
+      const el = document.getElementById('mensagem');
+      el.textContent = texto;
+      el.className = ehErro ? 'falha' : 'sucesso';
+    }
+
+    function limparMensagem() {
+      const el = document.getElementById('mensagem');
+      el.textContent = '';
+      el.className = '';
+    }
+
+    function limparErros() {
+      for (const p of document.querySelectorAll('.erro')) {
+        p.textContent = '';
+      }
+    }
+
+    function exibirErros(erros) {
+      // erros chega assim: { "titulo": "mensagem", "ano": "mensagem" }
+      for (const campo in erros) {
+        const el = document.getElementById('erro-' + campo);
+        if (el) {
+          el.textContent = erros[campo];
+        }
+      }
+    }
+
+    function mostrarLista() {
+      document.getElementById('telaForm').style.display = 'none';
+      document.getElementById('telaLista').style.display = 'block';
+      carregarLista();
+    }
+
+    async function carregarLista() {
+      try {
+        const resp = await fetch('/jogos');
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+        const jogos = await resp.json();
+        const lista = document.getElementById('lista');
+        lista.innerHTML = '';
+        for (const j of jogos) {
+          let aviso = '';
+          if (!j.disponivel) {
+            aviso = '<span class="indisponivel">INDISPONÍVEL</span>';
+          }
+          lista.insertAdjacentHTML('beforeend', `
+            <div class="card">
+              <div>
+                <strong>${j.titulo}</strong> ${aviso}<br>
+                <strong>Ano de lançamento: ${j.ano}</strong><br>
+                <strong>Plataforma: ${j.plataforma}</strong>
+              </div>
+              <div>
+                <button class="btn-alterar" onclick="abrirFormAlterar(${j.id})">Alterar</button>
+                <button class="btn-excluir" onclick="excluirJogo(${j.id})">Excluir</button>
+              </div>
+            </div>`);
+        }
+      } catch (err) {
+        mostrarMensagem('Erro ao carregar a lista: ' + err.message, true);
+      }
+    }
+
+    function abrirFormNovo() {
+      limparMensagem();
+      limparErros();
+      idEmEdicao = null;
+      document.getElementById('formJogo').reset();
+      document.getElementById('dispSim').checked = true;
+      document.getElementById('tituloForm').textContent = 'Incluir novo jogo';
+      document.getElementById('telaLista').style.display = 'none';
+      document.getElementById('telaForm').style.display = 'block';
+    }
+
+    async function abrirFormAlterar(id) {
+      limparMensagem();
+      limparErros();
+      const resp = await fetch('/jogos/' + id);
+      if (!resp.ok) {
+        mostrarMensagem('Não foi possível carregar o jogo.', true);
+        return;
+      }
+      const j = await resp.json();
+      idEmEdicao = id;
+      document.getElementById('titulo').value = j.titulo;
+      document.getElementById('ano').value = j.ano;
+      document.getElementById('plataforma').value = j.plataforma;
+      document.getElementById('observacoes').value = j.observacoes ?? '';
+      if (j.disponivel) {
+        document.getElementById('dispSim').checked = true;
+      } else {
+        document.getElementById('dispNao').checked = true;
+      }
+      document.getElementById('tituloForm').textContent = 'Alterar jogo - ID ' + id;
+      document.getElementById('telaLista').style.display = 'none';
+      document.getElementById('telaForm').style.display = 'block';
+    }
+
+    document.getElementById('formJogo').addEventListener('submit', async (evt) => {
+      evt.preventDefault();
+      limparErros();
+      limparMensagem();
+      const f = evt.target;
+
+      const dados = {
+        titulo: f.titulo.value,
+        ano: f.ano.value === '' ? null : Number(f.ano.value),
+        plataforma: f.plataforma.value,
+        disponivel: f.disponivel.value === 'true',
+        observacoes: f.observacoes.value,
+      };
+
+      let url = '/jogos';
+      let metodo = 'POST';
+      if (idEmEdicao !== null) {
+        url = '/jogos/' + idEmEdicao;
+        metodo = 'PUT';
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: metodo,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados),
+        });
+
+        if (resp.ok) {
+          mostrarLista();
+          mostrarMensagem('Jogo salvo com sucesso!', false);
+        } else if (resp.status === 400) {
+          exibirErros(await resp.json());
+          mostrarMensagem('Corrija os erros indicados no formulário.', true);
+        } else {
+          mostrarMensagem('Erro ao salvar: HTTP ' + resp.status, true);
+        }
+      } catch (err) {
+        mostrarMensagem('Não foi possível conectar ao servidor.', true);
+      }
+    });
+
+    async function excluirJogo(id) {
+      const confirmado = window.confirm('Deseja excluir o jogo ID ' + id + '?');
+      if (!confirmado) {
+        return;
+      }
+      const resp = await fetch('/jogos/' + id, { method: 'DELETE' });
+      if (resp.ok) {
+        await carregarLista();
+        mostrarMensagem('Jogo excluído com sucesso!', false);
+      } else {
+        mostrarMensagem('Erro ao excluir: HTTP ' + resp.status, true);
+      }
+    }
+
+    carregarLista();
+  </script>
+</body>
+</html>
