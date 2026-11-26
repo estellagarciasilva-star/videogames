@@ -35,77 +35,95 @@
     <form id="formJogo" novalidate>
       <div class="campo">
         <label for="titulo">Título</label>
-        <input type="text" id="titulo" name="titulo">
+        <input type="text" id="titulo">
         <p class="erro" id="erro-titulo"></p>
       </div>
       <div class="campo">
         <label for="ano">Ano de lançamento</label>
-        <input type="number" id="ano" name="ano">
+        <input type="number" id="ano">
         <p class="erro" id="erro-ano"></p>
       </div>
       <div class="campo">
         <label for="plataforma">Plataforma</label>
-        <input type="text" id="plataforma" name="plataforma">
+        <input type="text" id="plataforma">
         <p class="erro" id="erro-plataforma"></p>
       </div>
       <div class="campo">
         <label>Disponível</label>
-        <label><input type="radio" name="disponivel" value="true" id="dispSim" checked> Sim</label>
-        <label><input type="radio" name="disponivel" value="false" id="dispNao"> Não</label>
+        <label><input type="radio" name="disponivel" id="dispSim" checked> Sim</label>
+        <label><input type="radio" name="disponivel" id="dispNao"> Não</label>
         <p class="erro" id="erro-disponivel"></p>
       </div>
       <div class="campo">
         <label for="observacoes">Observações</label>
-        <textarea id="observacoes" name="observacoes" rows="4"></textarea>
+        <textarea id="observacoes" rows="4"></textarea>
         <p class="erro" id="erro-observacoes"></p>
       </div>
       <button type="submit">Salvar</button>
-      <button type="button" onclick="mostrarLista()">Cancelar</button>
+      <button type="button" onclick="mostrarTelaLista()">Cancelar</button>
     </form>
   </section>
 
   <footer>
     Estella Garcia Silva / Nicolle Lima Feitosa / Turma 3B Noturno / 2026<br>
-    Usou IA?: Sim, Claude.
+    Usou IA?: Sim, utilizamos o uso da inteligência artificial Claude como ferramente de apoio,
+     principalmente no index.html, compreensão do código e depuração.
   </footer>
 
   <script>
+    // Guarda o id do jogo que está sendo alterado (null quando estiver incluindo um novo)
     let idEmEdicao = null;
 
+    // Mostra uma mensagem verde (sucesso) ou vermelha (erro) no topo da página
     function mostrarMensagem(texto, ehErro) {
       const el = document.getElementById('mensagem');
       el.textContent = texto;
-      el.className = ehErro ? 'falha' : 'sucesso';
+      if (ehErro) {
+        el.className = 'falha';
+      } else {
+        el.className = 'sucesso';
+      }
     }
 
+    // Esconde a mensagem do topo
     function limparMensagem() {
       const el = document.getElementById('mensagem');
       el.textContent = '';
       el.className = '';
     }
 
+    // Apaga os textos de erro embaixo de cada campo
     function limparErros() {
-      for (const p of document.querySelectorAll('.erro')) {
-        p.textContent = '';
-      }
+      document.getElementById('erro-titulo').textContent = '';
+      document.getElementById('erro-ano').textContent = '';
+      document.getElementById('erro-plataforma').textContent = '';
+      document.getElementById('erro-disponivel').textContent = '';
+      document.getElementById('erro-observacoes').textContent = '';
     }
 
+    // Mostra embaixo de cada campo o erro que o Spring Boot enviou (formato: { "titulo": "mensagem", ... })
     function exibirErros(erros) {
-      // erros chega assim: { "titulo": "mensagem", "ano": "mensagem" }
-      for (const campo in erros) {
-        const el = document.getElementById('erro-' + campo);
-        if (el) {
-          el.textContent = erros[campo];
-        }
-      }
+      document.getElementById('erro-titulo').textContent = erros.titulo || '';
+      document.getElementById('erro-ano').textContent = erros.ano || '';
+      document.getElementById('erro-plataforma').textContent = erros.plataforma || '';
+      document.getElementById('erro-disponivel').textContent = erros.disponivel || '';
+      document.getElementById('erro-observacoes').textContent = erros.observacoes || '';
     }
 
-    function mostrarLista() {
+    // Mostra a tela com a lista de jogos e atualiza a lista
+    function mostrarTelaLista() {
       document.getElementById('telaForm').style.display = 'none';
       document.getElementById('telaLista').style.display = 'block';
       carregarLista();
     }
 
+    // Mostra a tela com o formulário (usada para incluir e para alterar)
+    function mostrarTelaForm() {
+      document.getElementById('telaLista').style.display = 'none';
+      document.getElementById('telaForm').style.display = 'block';
+    }
+
+    // Busca os jogos no backend (GET /jogos) e desenha um card para cada um
     async function carregarLista() {
       try {
         const resp = await fetch('/jogos');
@@ -138,17 +156,21 @@
       }
     }
 
+    // Abre o formulário vazio para incluir um novo jogo
     function abrirFormNovo() {
       limparMensagem();
       limparErros();
       idEmEdicao = null;
-      document.getElementById('formJogo').reset();
+      document.getElementById('titulo').value = '';
+      document.getElementById('ano').value = '';
+      document.getElementById('plataforma').value = '';
       document.getElementById('dispSim').checked = true;
+      document.getElementById('observacoes').value = '';
       document.getElementById('tituloForm').textContent = 'Incluir novo jogo';
-      document.getElementById('telaLista').style.display = 'none';
-      document.getElementById('telaForm').style.display = 'block';
+      mostrarTelaForm();
     }
 
+    // Busca o jogo no backend (GET /jogos/{id}) e abre o formulário com os dados preenchidos
     async function abrirFormAlterar(id) {
       limparMensagem();
       limparErros();
@@ -169,22 +191,29 @@
         document.getElementById('dispNao').checked = true;
       }
       document.getElementById('tituloForm').textContent = 'Alterar jogo - ID ' + id;
-      document.getElementById('telaLista').style.display = 'none';
-      document.getElementById('telaForm').style.display = 'block';
+      mostrarTelaForm();
     }
 
-    document.getElementById('formJogo').addEventListener('submit', async (evt) => {
+    // Envia o formulário: POST /jogos (novo) ou PUT /jogos/{id} (alteração)
+    async function salvarJogo(evt) {
       evt.preventDefault();
       limparErros();
       limparMensagem();
-      const f = evt.target;
+
+      // Se o ano estiver vazio, envia null para o Spring Boot avisar que é obrigatório
+      let ano = document.getElementById('ano').value;
+      if (ano === '') {
+        ano = null;
+      } else {
+        ano = Number(ano);
+      }
 
       const dados = {
-        titulo: f.titulo.value,
-        ano: f.ano.value === '' ? null : Number(f.ano.value),
-        plataforma: f.plataforma.value,
-        disponivel: f.disponivel.value === 'true',
-        observacoes: f.observacoes.value,
+        titulo: document.getElementById('titulo').value,
+        ano: ano,
+        plataforma: document.getElementById('plataforma').value,
+        disponivel: document.getElementById('dispSim').checked,
+        observacoes: document.getElementById('observacoes').value
       };
 
       let url = '/jogos';
@@ -198,14 +227,15 @@
         const resp = await fetch(url, {
           method: metodo,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dados),
+          body: JSON.stringify(dados)
         });
 
         if (resp.ok) {
-          mostrarLista();
+          mostrarTelaLista();
           mostrarMensagem('Jogo salvo com sucesso!', false);
         } else if (resp.status === 400) {
-          exibirErros(await resp.json());
+          const erros = await resp.json();
+          exibirErros(erros);
           mostrarMensagem('Corrija os erros indicados no formulário.', true);
         } else {
           mostrarMensagem('Erro ao salvar: HTTP ' + resp.status, true);
@@ -213,8 +243,9 @@
       } catch (err) {
         mostrarMensagem('Não foi possível conectar ao servidor.', true);
       }
-    });
+    }
 
+    // Pede confirmação e, se o usuário clicar em OK, exclui o jogo (DELETE /jogos/{id})
     async function excluirJogo(id) {
       const confirmado = window.confirm('Deseja excluir o jogo ID ' + id + '?');
       if (!confirmado) {
@@ -229,6 +260,10 @@
       }
     }
 
+    // Liga o botão Salvar do formulário à função salvarJogo
+    document.getElementById('formJogo').addEventListener('submit', salvarJogo);
+
+    // Ao abrir a página, carrega a lista de jogos
     carregarLista();
   </script>
 </body>
